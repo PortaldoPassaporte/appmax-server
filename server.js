@@ -4,14 +4,22 @@ const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
 
-// Credenciais AppMax (sandbox)
+// CORS liberado para qualquer origem
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.options('*', cors());
+
+// Credenciais AppMax (sandbox/homologação)
 const CLIENT_ID = '68aa02bb60ef4003a30ee6286850ab8c';
 const CLIENT_SECRET = '757007633def4a4089b215a5e764061c';
 const BASE_URL = 'https://breakingcode.sandboxappmax.com.br';
 
-// Função para obter token de acesso
+// Função para obter token OAuth
 async function getAccessToken() {
   const resp = await fetch(`${BASE_URL}/oauth/token`, {
     method: 'POST',
@@ -23,15 +31,28 @@ async function getAccessToken() {
     })
   });
   const data = await resp.json();
+  console.log('Token response:', JSON.stringify(data));
+  if (!data.access_token) throw new Error('Token não obtido: ' + JSON.stringify(data));
   return data.access_token;
 }
+
+// Rota de verificação (acordar o servidor)
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Portal do Passaporte - Servidor AppMax ativo!' });
+});
+
+app.get('/ping', (req, res) => {
+  res.json({ pong: true });
+});
 
 // Rota principal - gerar boleto
 app.post('/gerar-boleto', async (req, res) => {
   try {
     const { nome, email, cpf, telefone, cep, logradouro, numero, bairro, cidade, estado } = req.body;
+    console.log('Requisição recebida:', { nome, email, cpf });
 
     const token = await getAccessToken();
+    console.log('Token obtido com sucesso');
 
     // 1. Criar cliente
     const clienteResp = await fetch(`${BASE_URL}/api/v1/customer`, {
@@ -55,7 +76,10 @@ app.post('/gerar-boleto', async (req, res) => {
       })
     });
     const cliente = await clienteResp.json();
-    console.log('Cliente:', cliente);
+    console.log('Cliente criado:', JSON.stringify(cliente));
+
+    const customer_id = cliente.id || cliente.data?.id;
+    if (!customer_id) throw new Error('Cliente não criado: ' + JSON.stringify(cliente));
 
     // 2. Criar pedido
     const pedidoResp = await fetch(`${BASE_URL}/api/v1/order`, {
@@ -65,17 +89,20 @@ app.post('/gerar-boleto', async (req, res) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        customer_id: cliente.id || cliente.data?.id,
+        customer_id,
         products: [{
           sku: 'ASSESSORIA-001',
-          name: 'Assessoria — Portal do Passaporte',
-          price: 29687, // valor em centavos
+          name: 'Assessoria Portal do Passaporte',
+          price: 29687,
           qty: 1
         }]
       })
     });
     const pedido = await pedidoResp.json();
-    console.log('Pedido:', pedido);
+    console.log('Pedido criado:', JSON.stringify(pedido));
+
+    const cart_id = pedido.cart_id || pedido.data?.cart_id;
+    if (!cart_id) throw new Error('Pedido não criado: ' + JSON.stringify(pedido));
 
     // 3. Gerar boleto
     const boletoResp = await fetch(`${BASE_URL}/api/v1/payment/billet`, {
@@ -85,28 +112,26 @@ app.post('/gerar-boleto', async (req, res) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        cart_id: pedido.cart_id || pedido.data?.cart_id,
+        cart_id,
         days_due_date: 3
       })
     });
     const boleto = await boletoResp.json();
-    console.log('Boleto:', boleto);
+    console.log('Boleto:', JSON.stringify(boleto));
+
+    const linha = boleto.billet_digitable_line || boleto.data?.billet_digitable_line;
+    const url = boleto.billet_url || boleto.data?.billet_url;
 
     res.json({
       success: true,
-      linha_digitavel: boleto.billet_digitable_line || boleto.data?.billet_digitable_line,
-      url_pdf: boleto.billet_url || boleto.data?.billet_url
+      linha_digitavel: linha || 'Linha não disponível',
+      url_pdf: url || '#'
     });
 
   } catch (err) {
-    console.error('Erro:', err);
+    console.error('Erro:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-// Rota de verificação
-app.get('/', (req, res) => {
-  res.json({ status: 'Portal do Passaporte - Servidor AppMax ativo!' });
 });
 
 const PORT = process.env.PORT || 3000;
