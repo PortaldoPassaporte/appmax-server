@@ -18,9 +18,15 @@ async function getAccessToken() {
   params.append('client_id', CLIENT_ID);
   params.append('client_secret', CLIENT_SECRET);
 
+  // Autenticação Basic conforme documentação AppMax
+  const basicAuth = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+
   const resp = await fetch(AUTH_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${basicAuth}`
+    },
     body: params
   });
   const text = await resp.text();
@@ -30,7 +36,7 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-app.get('/', (req, res) => res.json({ status: 'ok', message: 'Portal do Passaporte - AppMax Server' }));
+app.get('/', (req, res) => res.json({ status: 'ok' }));
 app.get('/ping', (req, res) => res.json({ pong: true }));
 
 app.post('/gerar-boleto', async (req, res) => {
@@ -39,12 +45,15 @@ app.post('/gerar-boleto', async (req, res) => {
     console.log('Gerando boleto para:', nome, email);
 
     const token = await getAccessToken();
-    console.log('Token OK');
+    console.log('Token obtido:', token.substring(0, 20) + '...');
 
     // Criar cliente
     const clienteResp = await fetch(`${API_URL}/api/v1/customer`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({
         firstname: nome.split(' ')[0],
         lastname: nome.split(' ').slice(1).join(' ') || 'Portal',
@@ -60,7 +69,7 @@ app.post('/gerar-boleto', async (req, res) => {
       })
     });
     const clienteText = await clienteResp.text();
-    console.log('Cliente response:', clienteText);
+    console.log('Cliente:', clienteText);
     const cliente = JSON.parse(clienteText);
     const customer_id = cliente.id || cliente.data?.id;
     if (!customer_id) throw new Error('Cliente não criado: ' + clienteText);
@@ -68,14 +77,17 @@ app.post('/gerar-boleto', async (req, res) => {
     // Criar pedido
     const pedidoResp = await fetch(`${API_URL}/api/v1/order`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({
         customer_id,
         products: [{ sku: 'ASSESSORIA-001', name: 'Assessoria Portal do Passaporte', price: 29687, qty: 1 }]
       })
     });
     const pedidoText = await pedidoResp.text();
-    console.log('Pedido response:', pedidoText);
+    console.log('Pedido:', pedidoText);
     const pedido = JSON.parse(pedidoText);
     const cart_id = pedido.cart_id || pedido.data?.cart_id;
     if (!cart_id) throw new Error('Pedido não criado: ' + pedidoText);
@@ -83,11 +95,14 @@ app.post('/gerar-boleto', async (req, res) => {
     // Gerar boleto
     const boletoResp = await fetch(`${API_URL}/api/v1/payment/billet`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ cart_id, days_due_date: 3 })
     });
     const boletoText = await boletoResp.text();
-    console.log('Boleto response:', boletoText);
+    console.log('Boleto:', boletoText);
     const boleto = JSON.parse(boletoText);
 
     res.json({
