@@ -12,91 +12,61 @@ const CLIENT_SECRET = '757007633def4a4089b215a5e764061c';
 const AUTH_URL = 'https://auth.sandboxappmax.com.br/oauth2/token';
 const API_URL = 'https://api.sandboxappmax.com.br';
 
-// Cache das credenciais do merchant
-let merchantCredentials = null;
-
-// Passo 1: Obter token do app
+// Passo 1: Token do app
 async function getAppToken() {
   const params = new URLSearchParams();
   params.append('grant_type', 'client_credentials');
   params.append('client_id', CLIENT_ID);
   params.append('client_secret', CLIENT_SECRET);
-
   const resp = await fetch(AUTH_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params
   });
-  const text = await resp.text();
-  console.log('App token response:', text);
-  const data = JSON.parse(text);
-  if (!data.access_token) throw new Error('Token do app não obtido: ' + text);
+  const data = await resp.json();
+  if (!data.access_token) throw new Error('Token não obtido: ' + JSON.stringify(data));
   return data.access_token;
 }
 
-// Passo 2: Gerar hash de autorização
-async function getAuthHash(appToken) {
-  const resp = await fetch(`${API_URL}/app/authorize`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${appToken}`
-    },
-    body: JSON.stringify({
-      client_id: CLIENT_ID,
-      redirect_uri: 'https://portaldopassaporte.com.br',
-      scope: 'all'
-    })
-  });
-  const text = await resp.text();
-  console.log('Auth hash response:', text);
-  const data = JSON.parse(text);
-  return data.hash || data.data?.hash || data.authorization_code || data.code;
-}
-
-// Passo 3: Gerar credenciais do merchant
-async function getMerchantCredentials(hash) {
-  const resp = await fetch(`https://api.appmax.com.br/app/client/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      hash: hash
-    })
-  });
-  const text = await resp.text();
-  console.log('Merchant credentials response:', text);
-  const data = JSON.parse(text);
-  return data;
-}
-
-// Obter token de acesso final para chamadas da API
-async function getAccessToken() {
-  const appToken = await getAppToken();
-  return appToken; // Usar o appToken diretamente para API sandbox
-}
-
-app.get('/', (req, res) => res.json({ status: 'ok' }));
 app.get('/ping', (req, res) => res.json({ pong: true }));
 
-// Rota de diagnóstico - testa o fluxo de autenticação completo
+// Diagnóstico completo - mostra o que /app/authorize retorna
 app.get('/diagnostico', async (req, res) => {
   try {
-    const appToken = await getAppToken();
-    console.log('App token OK:', appToken.substring(0, 30) + '...');
+    const token = await getAppToken();
+    console.log('Token OK:', token.substring(0, 30));
 
-    // Testar chamada simples à API
-    const testResp = await fetch(`${API_URL}/api/v1/customer`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${appToken}` }
+    // Tentar /app/authorize
+    const authResp = await fetch(`${API_URL}/app/authorize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        client_id: CLIENT_ID,
+        redirect_uri: 'https://portaldopassaporte.com.br',
+        scope: 'all'
+      })
     });
-    const testText = await testResp.text();
-    console.log('Test API response:', testText);
+    const authText = await authResp.text();
+    console.log('Authorize response:', authText);
+
+    // Tentar também sem body
+    const authResp2 = await fetch(`${API_URL}/app/authorize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ client_id: CLIENT_ID })
+    });
+    const authText2 = await authResp2.text();
 
     res.json({
-      app_token: appToken.substring(0, 30) + '...',
-      api_test: testText.substring(0, 200)
+      token_preview: token.substring(0, 50) + '...',
+      authorize_response_1: authText,
+      authorize_response_2: authText2
     });
   } catch(err) {
     res.json({ error: err.message });
@@ -106,11 +76,8 @@ app.get('/diagnostico', async (req, res) => {
 app.post('/gerar-boleto', async (req, res) => {
   try {
     const { nome, email, cpf, telefone, cep, logradouro, numero, bairro, cidade, estado } = req.body;
-    console.log('Gerando boleto para:', nome, email);
+    const token = await getAppToken();
 
-    const token = await getAccessToken();
-
-    // Criar cliente
     const clienteResp = await fetch(`${API_URL}/api/v1/customer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -129,12 +96,10 @@ app.post('/gerar-boleto', async (req, res) => {
       })
     });
     const clienteText = await clienteResp.text();
-    console.log('Cliente:', clienteText);
     const cliente = JSON.parse(clienteText);
     const customer_id = cliente.id || cliente.data?.id;
     if (!customer_id) throw new Error('Cliente não criado: ' + clienteText);
 
-    // Criar pedido
     const pedidoResp = await fetch(`${API_URL}/api/v1/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -143,21 +108,16 @@ app.post('/gerar-boleto', async (req, res) => {
         products: [{ sku: 'ASSESSORIA-001', name: 'Assessoria Portal do Passaporte', price: 29687, qty: 1 }]
       })
     });
-    const pedidoText = await pedidoResp.text();
-    console.log('Pedido:', pedidoText);
-    const pedido = JSON.parse(pedidoText);
+    const pedido = await pedidoResp.json();
     const cart_id = pedido.cart_id || pedido.data?.cart_id;
-    if (!cart_id) throw new Error('Pedido não criado: ' + pedidoText);
+    if (!cart_id) throw new Error('Pedido não criado: ' + JSON.stringify(pedido));
 
-    // Gerar boleto
     const boletoResp = await fetch(`${API_URL}/api/v1/payment/billet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ cart_id, days_due_date: 3 })
     });
-    const boletoText = await boletoResp.text();
-    console.log('Boleto:', boletoText);
-    const boleto = JSON.parse(boletoText);
+    const boleto = await boletoResp.json();
 
     res.json({
       success: true,
@@ -166,10 +126,9 @@ app.post('/gerar-boleto', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Erro:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`Rodando na porta ${PORT}`));
