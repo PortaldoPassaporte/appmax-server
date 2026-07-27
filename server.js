@@ -269,7 +269,7 @@ app.post('/gerar-boleto', async (req, res) => {
     if (!cart_id) throw new Error('Pedido não criado: ' + pedidoText);
 
     // Gerar boleto
-    const boletoResp = await fetch(`${API_URL}/v1/payments/billet`, {
+    const boletoResp = await fetch(`${API_URL}/v1/payments/boleto`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
