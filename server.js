@@ -9,10 +9,12 @@ app.options('*', cors());
 
 const CLIENT_ID = '68aa02bb60ef4003a30ee6286850ab8c';
 const CLIENT_SECRET = '757007633def4a4089b215a5e764061c';
+const APP_ID = 1377;
 const AUTH_URL = 'https://auth.sandboxappmax.com.br/oauth2/token';
 const API_URL = 'https://api.sandboxappmax.com.br';
 
-// Passo 1: Token do app
+let merchantToken = null;
+
 async function getAppToken() {
   const params = new URLSearchParams();
   params.append('grant_type', 'client_credentials');
@@ -28,46 +30,74 @@ async function getAppToken() {
   return data.access_token;
 }
 
+async function getAccessToken() {
+  // Se já temos merchant token em cache, usar
+  if (merchantToken) return merchantToken;
+
+  const appToken = await getAppToken();
+
+  // Chamar /app/authorize com os campos corretos
+  const authResp = await fetch(`${API_URL}/app/authorize`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${appToken}`
+    },
+    body: JSON.stringify({
+      app_id: APP_ID,
+      url_callback: 'https://portaldopassaporte.com.br'
+    })
+  });
+  const authData = await authResp.json();
+  console.log('Authorize:', JSON.stringify(authData));
+
+  // Pegar o hash/token retornado
+  const hash = authData.hash || authData.data?.hash || authData.token || authData.data?.token;
+
+  if (hash) {
+    // Gerar credenciais do merchant com o hash
+    const genResp = await fetch(`https://api.appmax.com.br/app/client/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        hash
+      })
+    });
+    const genData = await genResp.json();
+    console.log('Generate:', JSON.stringify(genData));
+    merchantToken = genData.access_token || genData.token || appToken;
+  } else {
+    // Se não tem hash, usar o appToken diretamente
+    merchantToken = appToken;
+  }
+
+  return merchantToken;
+}
+
 app.get('/ping', (req, res) => res.json({ pong: true }));
 
-// Diagnóstico completo - mostra o que /app/authorize retorna
 app.get('/diagnostico', async (req, res) => {
   try {
-    const token = await getAppToken();
-    console.log('Token OK:', token.substring(0, 30));
+    merchantToken = null; // resetar cache para testar
+    const appToken = await getAppToken();
 
-    // Tentar /app/authorize
     const authResp = await fetch(`${API_URL}/app/authorize`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${appToken}`
       },
       body: JSON.stringify({
-        client_id: CLIENT_ID,
-        redirect_uri: 'https://portaldopassaporte.com.br',
-        scope: 'all'
+        app_id: APP_ID,
+        url_callback: 'https://portaldopassaporte.com.br'
       })
     });
-    const authText = await authResp.text();
-    console.log('Authorize response:', authText);
+    const authData = await authResp.json();
+    console.log('Authorize:', JSON.stringify(authData));
 
-    // Tentar também sem body
-    const authResp2 = await fetch(`${API_URL}/app/authorize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ client_id: CLIENT_ID })
-    });
-    const authText2 = await authResp2.text();
-
-    res.json({
-      token_preview: token.substring(0, 50) + '...',
-      authorize_response_1: authText,
-      authorize_response_2: authText2
-    });
+    res.json({ authorize_response: authData });
   } catch(err) {
     res.json({ error: err.message });
   }
@@ -76,7 +106,7 @@ app.get('/diagnostico', async (req, res) => {
 app.post('/gerar-boleto', async (req, res) => {
   try {
     const { nome, email, cpf, telefone, cep, logradouro, numero, bairro, cidade, estado } = req.body;
-    const token = await getAppToken();
+    const token = await getAccessToken();
 
     const clienteResp = await fetch(`${API_URL}/api/v1/customer`, {
       method: 'POST',
@@ -84,21 +114,16 @@ app.post('/gerar-boleto', async (req, res) => {
       body: JSON.stringify({
         firstname: nome.split(' ')[0],
         lastname: nome.split(' ').slice(1).join(' ') || 'Portal',
-        email,
-        document_number: cpf.replace(/\D/g, ''),
+        email, document_number: cpf.replace(/\D/g, ''),
         phone: telefone.replace(/\D/g, ''),
         postcode: cep.replace(/\D/g, ''),
-        street: logradouro,
-        street_number: numero || 'SN',
-        neighborhood: bairro,
-        city: cidade,
-        state: estado
+        street: logradouro, street_number: numero || 'SN',
+        neighborhood: bairro, city: cidade, state: estado
       })
     });
-    const clienteText = await clienteResp.text();
-    const cliente = JSON.parse(clienteText);
+    const cliente = await clienteResp.json();
     const customer_id = cliente.id || cliente.data?.id;
-    if (!customer_id) throw new Error('Cliente não criado: ' + clienteText);
+    if (!customer_id) throw new Error('Cliente não criado: ' + JSON.stringify(cliente));
 
     const pedidoResp = await fetch(`${API_URL}/api/v1/order`, {
       method: 'POST',
