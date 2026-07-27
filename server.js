@@ -265,7 +265,7 @@ app.post('/gerar-boleto', async (req, res) => {
     const pedidoText = await pedidoResp.text();
     console.log('Pedido:', pedidoText);
     const pedido = JSON.parse(pedidoText);
-    const cart_id = pedido.cart_id || (pedido.data && pedido.data.cart_id) || (pedido.data && pedido.data.order && pedido.data.order.cart_id);
+    const cart_id = pedido.cart_id || (pedido.data && pedido.data.cart_id) || (pedido.data && pedido.data.order && (pedido.data.order.cart_id || pedido.data.order.id));
     if (!cart_id) throw new Error('Pedido não criado: ' + pedidoText);
 
     // Gerar boleto
@@ -275,7 +275,7 @@ app.post('/gerar-boleto', async (req, res) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ cart_id, days_due_date: 3 })
+      body: JSON.stringify({ order_id: cart_id, cart_id, days_due_date: 3 })
     });
     const boletoText = await boletoResp.text();
     console.log('Boleto:', boletoText);
