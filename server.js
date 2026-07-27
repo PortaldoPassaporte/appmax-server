@@ -293,8 +293,8 @@ app.post('/gerar-boleto', async (req, res) => {
 
     res.json({
       success: true,
-      linha_digitavel: boleto.billet_digitable_line || (boleto.data && boleto.data.billet_digitable_line) || (boleto.data && boleto.data.payment && boleto.data.payment.billet_digitable_line) || 'Não disponível',
-      url_pdf: boleto.billet_url || (boleto.data && boleto.data.billet_url) || (boleto.data && boleto.data.payment && boleto.data.payment.billet_url) || '#'
+      linha_digitavel: boleto.billet_digitable_line || (boleto.data && boleto.data.billet_digitable_line) || (boleto.data && boleto.data.payment && boleto.data.payment.boleto_digitable_line) || 'Não disponível',
+      url_pdf: boleto.billet_url || (boleto.data && boleto.data.billet_url) || (boleto.data && boleto.data.payment && boleto.data.payment.boleto_link_pdf) || '#'
     });
 
   } catch (err) {
