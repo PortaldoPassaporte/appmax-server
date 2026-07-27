@@ -13,8 +13,8 @@ app.options('*', cors());
 // instalação (etapas /app/authorize e /app/client/generate).
 // NÃO servem para criar cliente/pedido/boleto.
 // ===================================================================
-const APP_CLIENT_ID = '68aa02bb60ef4003a30ee6286850ab8c';
-const APP_CLIENT_SECRET = '757007633def4a4089b215a5e764061c';
+const APP_CLIENT_ID = 'ab0b5d70b55c44e1a5af6769412c3b2b';
+const APP_CLIENT_SECRET = 'e677f625c5d64b84b137bd76262e4b8d';
 
 // PREENCHER: o "App UUID" do seu aplicativo (não é o Client ID, nem o
 // "Numerical ID"). Procure no painel da Appmax, na página do app, algo
@@ -29,9 +29,9 @@ const EXTERNAL_KEY = 'portaldopassaporte-loja-01';
 const BASE_URL = process.env.BASE_URL || 'https://appmax-server.onrender.com';
 const URL_CALLBACK = `${BASE_URL}/callback`;
 
-const AUTH_URL = 'https://auth.sandboxappmax.com.br/oauth2/token';
-const API_URL = 'https://api.sandboxappmax.com.br';
-const REDIRECT_BASE = 'https://breakingcode.sandboxappmax.com.br/appstore/integration';
+const AUTH_URL = 'https://auth.appmax.com.br/oauth2/token';
+const API_URL = 'https://api.appmax.com.br';
+const REDIRECT_BASE = 'https://admin.appmax.com.br/appstore/integration';
 
 // Identificador fixo e único desta loja — gerado uma vez e mantido sempre igual.
 // Depois de rodar pela primeira vez, copie o valor logado no console para a
