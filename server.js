@@ -4,6 +4,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 
 const app = express();
+app.set('trust proxy', true);
 app.use(express.json());
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.options('*', cors());
@@ -216,6 +217,8 @@ app.post('/gerar-boleto', async (req, res) => {
     const token = await getMerchantAccessToken();
     console.log('Token do merchant obtido:', token.substring(0, 20) + '...');
 
+    const clienteIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '0.0.0.0').split(',')[0].trim();
+
     // Criar cliente
     const clienteResp = await fetch(`${API_URL}/v1/customers`, {
       method: 'POST',
@@ -224,17 +227,20 @@ app.post('/gerar-boleto', async (req, res) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        firstname: nome.split(' ')[0],
-        lastname: nome.split(' ').slice(1).join(' ') || 'Portal',
+        first_name: nome.split(' ')[0],
+        last_name: nome.split(' ').slice(1).join(' ') || 'Portal',
         email,
         document_number: cpf.replace(/\D/g, ''),
         phone: telefone.replace(/\D/g, ''),
-        postcode: cep.replace(/\D/g, ''),
-        street: logradouro,
-        street_number: numero || 'SN',
-        neighborhood: bairro,
-        city: cidade,
-        state: estado
+        ip: clienteIp,
+        address: {
+          postcode: cep.replace(/\D/g, ''),
+          street: logradouro,
+          number: numero || 'SN',
+          district: bairro,
+          city: cidade,
+          state: estado
+        }
       })
     });
     const clienteText = await clienteResp.text();
