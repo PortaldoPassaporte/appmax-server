@@ -275,7 +275,17 @@ app.post('/gerar-boleto', async (req, res) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ order_id: cart_id, cart_id, days_due_date: 3 })
+      body: JSON.stringify({
+        order_id: cart_id,
+        cart_id,
+        payment_data: {
+          boleto: {
+            document_number: cpf.replace(/\D/g, ''),
+            days_due_date: 3
+          }
+        },
+        days_due_date: 3
+      })
     });
     const boletoText = await boletoResp.text();
     console.log('Boleto:', boletoText);
