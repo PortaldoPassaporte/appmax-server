@@ -259,7 +259,7 @@ app.post('/gerar-boleto', async (req, res) => {
       },
       body: JSON.stringify({
         customer_id,
-        products: [{ sku: 'ASSESSORIA-001', name: 'Assessoria Portal do Passaporte', unit_value: 29687, qty: 1 }]
+        products: [{ sku: 'ASSESSORIA-001', name: 'Assessoria Portal do Passaporte', unit_value: 29687, quantity: 1 }]
       })
     });
     const pedidoText = await pedidoResp.text();
