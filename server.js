@@ -100,6 +100,16 @@ app.post('/health-check', (req, res) => {
 });
 
 // ===================================================================
+// URL DE WEBHOOK (campo obrigatório no painel) — por enquanto só
+// registra o evento recebido no log. Cadastre no painel como:
+//   https://appmax-server.onrender.com/webhook
+// ===================================================================
+app.post('/webhook', (req, res) => {
+  console.log('Webhook recebido da Appmax:', req.body);
+  res.status(200).json({ received: true });
+});
+
+// ===================================================================
 // ETAPA 1 (rodar uma única vez): abra esta URL no navegador para
 // começar a instalação:
 //   https://appmax-server.onrender.com/instalar
