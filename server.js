@@ -212,6 +212,7 @@ app.get('/callback', async (req, res) => {
 app.post('/gerar-boleto', async (req, res) => {
   try {
     const { nome, email, cpf, telefone, cep, logradouro, numero, bairro, cidade, estado } = req.body;
+    console.log('Dados recebidos do site:', JSON.stringify(req.body));
     console.log('Gerando boleto para:', nome, email);
 
     const token = await getMerchantAccessToken();
@@ -231,7 +232,7 @@ app.post('/gerar-boleto', async (req, res) => {
         last_name: nome.split(' ').slice(1).join(' ') || 'Portal',
         email,
         document_number: cpf.replace(/\D/g, ''),
-        phone: telefone.replace(/\D/g, ''),
+        phone: (telefone || '').replace(/\D/g, ''),
         ip: clienteIp,
         address: {
           postcode: cep.replace(/\D/g, ''),
@@ -258,7 +259,7 @@ app.post('/gerar-boleto', async (req, res) => {
       },
       body: JSON.stringify({
         customer_id,
-        products: [{ sku: 'ASSESSORIA-001', name: 'Assessoria Portal do Passaporte', unit_value: 296.87, qty: 1 }]
+        products: [{ sku: 'ASSESSORIA-001', name: 'Assessoria Portal do Passaporte', unit_value: 29687, qty: 1 }]
       })
     });
     const pedidoText = await pedidoResp.text();
