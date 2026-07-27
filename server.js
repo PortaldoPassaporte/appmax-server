@@ -246,7 +246,7 @@ app.post('/gerar-boleto', async (req, res) => {
     const clienteText = await clienteResp.text();
     console.log('Cliente:', clienteText);
     const cliente = JSON.parse(clienteText);
-    const customer_id = cliente.id || (cliente.data && cliente.data.id);
+    const customer_id = cliente.id || (cliente.data && cliente.data.id) || (cliente.data && cliente.data.customer && cliente.data.customer.id);
     if (!customer_id) throw new Error('Cliente não criado: ' + clienteText);
 
     // Criar pedido
@@ -264,7 +264,7 @@ app.post('/gerar-boleto', async (req, res) => {
     const pedidoText = await pedidoResp.text();
     console.log('Pedido:', pedidoText);
     const pedido = JSON.parse(pedidoText);
-    const cart_id = pedido.cart_id || (pedido.data && pedido.data.cart_id);
+    const cart_id = pedido.cart_id || (pedido.data && pedido.data.cart_id) || (pedido.data && pedido.data.order && pedido.data.order.cart_id);
     if (!cart_id) throw new Error('Pedido não criado: ' + pedidoText);
 
     // Gerar boleto
@@ -282,8 +282,8 @@ app.post('/gerar-boleto', async (req, res) => {
 
     res.json({
       success: true,
-      linha_digitavel: boleto.billet_digitable_line || (boleto.data && boleto.data.billet_digitable_line) || 'Não disponível',
-      url_pdf: boleto.billet_url || (boleto.data && boleto.data.billet_url) || '#'
+      linha_digitavel: boleto.billet_digitable_line || (boleto.data && boleto.data.billet_digitable_line) || (boleto.data && boleto.data.payment && boleto.data.payment.billet_digitable_line) || 'Não disponível',
+      url_pdf: boleto.billet_url || (boleto.data && boleto.data.billet_url) || (boleto.data && boleto.data.payment && boleto.data.payment.billet_url) || '#'
     });
 
   } catch (err) {
