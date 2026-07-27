@@ -217,7 +217,7 @@ app.post('/gerar-boleto', async (req, res) => {
     console.log('Token do merchant obtido:', token.substring(0, 20) + '...');
 
     // Criar cliente
-    const clienteResp = await fetch(`${API_URL}/api/v1/customer`, {
+    const clienteResp = await fetch(`${API_URL}/v1/customers`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -244,7 +244,7 @@ app.post('/gerar-boleto', async (req, res) => {
     if (!customer_id) throw new Error('Cliente não criado: ' + clienteText);
 
     // Criar pedido
-    const pedidoResp = await fetch(`${API_URL}/api/v1/order`, {
+    const pedidoResp = await fetch(`${API_URL}/v1/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -262,7 +262,7 @@ app.post('/gerar-boleto', async (req, res) => {
     if (!cart_id) throw new Error('Pedido não criado: ' + pedidoText);
 
     // Gerar boleto
-    const boletoResp = await fetch(`${API_URL}/api/v1/payment/billet`, {
+    const boletoResp = await fetch(`${API_URL}/v1/payments/billet`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
