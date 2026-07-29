@@ -66,9 +66,16 @@ async function getAppAccessToken() {
 }
 
 // ===== Token do MERCHANT (usado para criar cliente/pedido/boleto) =====
+let cachedMerchantToken = null;
+let cachedMerchantTokenExpiry = 0;
+
 async function getMerchantAccessToken() {
   if (!MERCHANT_CLIENT_ID || !MERCHANT_CLIENT_SECRET) {
     throw new Error('Credenciais do merchant ainda não configuradas. Complete a instalação em /instalar primeiro.');
+  }
+  // Reutiliza o token em cache se ainda for válido (com 2 min de margem de segurança)
+  if (cachedMerchantToken && Date.now() < cachedMerchantTokenExpiry - 120000) {
+    return cachedMerchantToken;
   }
   const params = new URLSearchParams();
   params.append('grant_type', 'client_credentials');
@@ -84,7 +91,9 @@ async function getMerchantAccessToken() {
   console.log('Auth (merchant) response:', text);
   const data = JSON.parse(text);
   if (!data.access_token) throw new Error('Token do merchant não obtido: ' + text);
-  return data.access_token;
+  cachedMerchantToken = data.access_token;
+  cachedMerchantTokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+  return cachedMerchantToken;
 }
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
